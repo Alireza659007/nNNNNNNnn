@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>بازی سکه</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: linear-gradient(135deg, #ff6b6b, #4ecdc4);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            color: white;
+            overflow: hidden;
+        }
+        .container {
+            text-align: center;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+        }
+        #game, #adminPanel, #loginPanel {
+            display: none;
+        }
+        #game.active, #adminPanel.active, #loginPanel.active {
+            display: block;
+        }
+        #coin {
+            width: 100px;
+            height: 100px;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        #coin:hover {
+            transform: scale(1.2);
+        }
+        .license-type {
+            font-size: 1.2em;
+            margin: 10px 0;
+            padding: 5px 10px;
+            border-radius: 5px;
+        }
+        .bronze { background: #cd7f32; }
+        .silver { background: #c0c0c0; }
+        .gold { background: #ffd700; }
+        input, button {
+            margin: 10px;
+            padding: 10px;
+            border-radius: 5px;
+            border: none;
+            font-size: 1em;
+        }
+        button {
+            background: #4ecdc4;
+            cursor: pointer;
+            color: white;
+        }
+        button:hover {
+            background: #ff6b6b;
+        }
+        #leaderboard {
+            margin-top: 20px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            padding: 10px;
+            border: 1px solid #fff;
+        }
+        .coin-animation {
+            position: absolute;
+            font-size: 2em;
+            color: gold;
+            animation: coinFly 1s ease-out forwards;
+        }
+        @keyframes coinFly {
+            0% { transform: translateY(0); opacity: 1; }
+            100% { transform: translateY(-100px); opacity: 0; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div id="loginPanel" class="active">
+            <h2>ورود به بازی</h2>
+            <input type="text" id="username" placeholder="نام کاربری">
+            <input type="text" id="licenseCode" placeholder="کد لایسنس">
+            <button onclick="login()">ورود</button>
+            <button onclick="showAdminLogin()">ورود به پنل مدیریت</button>
+        </div>
+
+        <div id="adminPanel">
+            <h2>پنل مدیریت</h2>
+            <input type="password" id="adminPassword" placeholder="رمز عبور">
+            <button onclick="adminLogin()">ورود</button>
+            <div id="adminControls" style="display: none;">
+                <h3>ساخت کد لایسنس</h3>
+                <input type="text" id="newLicenseCode" placeholder="کد لایسنس">
+                <select id="licenseType">
+                    <option value="bronze">برنز (1 سکه)</option>
+                    <option value="silver">نقره (2 سکه)</option>
+                    <option value="gold">گلد (3 سکه)</option>
+                </select>
+                <input type="number" id="licenseDays" placeholder="مدت زمان (روز)">
+                <select id="animal">
+                    <option value="hamster">همستر</option>
+                    <option value="cat">گربه</option>
+                    <option value="dog">سگ</option>
+                </select>
+                <button onclick="createLicense()">ساخت کد</button>
+                <h3>شارژ کد لایسنس</h3>
+                <input type="text" id="rechargeCode" placeholder="کد لایسنس">
+                <input type="number" id="rechargeDays" placeholder="مدت زمان (روز)">
+                <button onclick="rechargeLicense()">شارژ</button>
+            </div>
+        </div>
+
+        <div id="game">
+            <h2>بازی سکه</h2>
+            <div id="userInfo"></div>
+            <img id="coin" src="https://via.placeholder.com/100?text=سکه" alt="سکه">
+            <p>سکه‌ها: <span id="coinCount">0</span></p>
+            <div class="license-type" id="licenseInfo"></div>
+            <p>زمان باقی‌مانده: <span id="timeLeft"></span></p>
+            <input type="text" id="transferUsername" placeholder="نام کاربری مقصد">
+            <input type="number" id="transferAmount" placeholder="تعداد سکه">
+            <button onclick="transferCoins()">انتقال سکه</button>
+            <h3>جدول جهانی</h3>
+            <table id="leaderboard">
+                <tr><th>رتبه</th><th>نام</th><th>سکه</th></tr>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        let users = JSON.parse(localStorage.getItem('users')) || {};
+        let licenses = JSON.parse(localStorage.getItem('licenses')) || {};
+        let currentUser = null;
+
+        function login() {
+            const username = document.getElementById('username').value.trim();
+            const licenseCode = document.getElementById('licenseCode').value.trim();
+            if (!username || !licenseCode) {
+                alert('نام کاربری و کد لایسنس را وارد کنید.');
+                return;
+            }
+            if (users[username]) {
+                alert('نام کاربری تکراری است.');
+                return;
+            }
+            if (!licenses[licenseCode] || licenses[licenseCode].used) {
+                alert('کد لایسنس نامعتبر یا استفاده‌شده است.');
+                return;
+            }
+            const license = licenses[licenseCode];
+            if (new Date() > new Date(license.expiry)) {
+                alert('کد لایسنس منقضی شده است.');
+                return;
+            }
+            users[username] = {
+                coins: 0,
+                license: license.type,
+                expiry: license.expiry,
+                animal: license.animal
+            };
+            licenses[licenseCode].used = true;
+            currentUser = username;
+            localStorage.setItem('users', JSON.stringify(users));
+            localStorage.setItem('licenses', JSON.stringify(licenses));
+            showGame();
+        }
+
+        function showAdminLogin() {
+            document.getElementById('loginPanel').style.display = 'none';
+            document.getElementById('adminPanel').style.display = 'block';
+        }
+
+        function adminLogin() {
+            const password = document.getElementById('adminPassword').value–
+
+;
+            if (password === 'Ali.dr.N') {
+                document.getElementById('adminControls').style.display = 'block';
+            } else {
+                alert('رمز عبور اشتباه است.');
+            }
+        }
+
+        function createLicense() {
+            const code = document.getElementById('newLicenseCode').value.trim();
+            const type = document.getElementById('licenseType').value;
+            const days = parseInt(document.getElementById('licenseDays').value);
+            const animal = document.getElementById('animal').value;
+            if (!code || !days) {
+                alert('کد و مدت زمان را وارد کنید.');
+                return;
+            }
+            if (licenses[code]) {
+                alert('کد لایسنس تکراری است–
+
+.');
+                return;
+            }
+            const expiry = new Date();
+            expiry.setDate(expiry.getDate() + days);
+            licenses[code] = {
+                type: type,
+                expiry: expiry.toISOString(),
+                animal: animal,
+                used: false
+            };
+            localStorage.setItem('licenses', JSON.stringify(licenses));
+            alert('کد لایسنس ساخته شد.');
+        }
+
+        function rechargeLicense() {
+            const code = document.getElementById('rechargeCode').value.trim();
+            const days = parseInt(document.getElementById('rechargeDays').value);
+            if (!code || !days) {
+                alert('کد و مدت زمان را وارد کنید.');
+                return;
+            }
+            if (!licenses[code]) {
+                alert('کد لایسنس یافت نشد.');
+ (...)
