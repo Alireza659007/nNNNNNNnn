@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>بازی همستر میلیاردی</title>
+<style>
+  body {
+    font-family: 'Vazir', sans-serif, Tahoma, sans-serif;
+    background: linear-gradient(120deg, #fceabb 0%, #f8b500 100%);
+    color: #333;
+    margin: 0; padding: 0;
+    user-select: none;
+  }
+  #login, #game, #adminPanel {
+    max-width: 400px;
+    margin: 2rem auto;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 0 25px rgba(0,0,0,0.1);
+    padding: 1rem 2rem 2rem;
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+  }
+  #login.active, #game.active, #adminPanel.active {
+    display: flex;
+  }
+  input, button, select {
+    font-size: 1rem;
+    padding: 0.6rem 1rem;
+    border-radius: 6px;
+    border: 1px solid #aaa;
+    width: 100%;
+    box-sizing: border-box;
+  }
+  button {
+    cursor: pointer;
+    background: #f8b500;
+    border: none;
+    font-weight: bold;
+    color: #fff;
+    transition: background 0.3s;
+  }
+  button:hover {
+    background: #d49700;
+  }
+  h1,h2 {
+    margin: 0;
+    color: #b56f00;
+  }
+  .coins {
+    font-weight: bold;
+    font-size: 2rem;
+    color: green;
+  }
+  .animal-img {
+    width: 150px;
+    height: 150px;
+    border-radius: 50%;
+    box-shadow: 0 0 20px gold;
+    animation: pulse 3s infinite ease-in-out;
+    cursor: pointer;
+  }
+  @keyframes pulse {
+    0% { box-shadow: 0 0 20px gold; transform: scale(1); }
+    50% { box-shadow: 0 0 40px gold; transform: scale(1.1); }
+    100% { box-shadow: 0 0 20px gold; transform: scale(1); }
+  }
+  .license-label {
+    font-weight: 700;
+    padding: 0.25rem 0.5rem;
+    border-radius: 8px;
+    color: white;
+    display: inline-block;
+    margin-bottom: 0.3rem;
+  }
+  .bronze { background: #cd7f32; }
+  .silver { background: #c0c0c0; color: #222; }
+  .gold { background: #ffd700; color: #222; }
+  #leaderboard {
+    margin-top: 1rem;
+    width: 100%;
+  }
+  #leaderboard table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  #leaderboard th, #leaderboard td {
+    border: 1px solid #ccc;
+    padding: 0.4rem;
+    text-align: center;
+  }
+  #leaderboard th {
+    background: #f8b500;
+    color: #fff;
+  }
+  .admin-header {
+    font-size: 1.5rem;
+    margin-bottom: 1rem;
+    color: #b56f00;
+  }
+  textarea {
+    width: 100%;
+    height: 100px;
+    resize: none;
+    border-radius: 6px;
+    border: 1px solid #aaa;
+    font-family: monospace;
+    font-size: 1rem;
+  }
+  .error-msg {
+    color: red;
+    font-weight: bold;
+  }
+</style>
+<script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
+<script>
+  // تنظیمات Firebase خودت را اینجا بگذار
+  const firebaseConfig = {
+    apiKey: "YOUR_API_KEY",
+    authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+    projectId: "YOUR_PROJECT_ID",
+  };
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.firestore();
+
+  // --- متغیرهای کلی ---
+  let currentUser = null;
+  let currentLicense = null;
+  let clickMultiplier = 1;
+  let animals = {
+    hamster: "https://i.ibb.co/T2x4xn3/hamster.png",
+    rabbit: "https://i.ibb.co/k4Q8LkR/rabbit.png",
+    cat: "https://i.ibb.co/sP5zGjZ/cat.png",
+    dog: "https://i.ibb.co/7KS2Dqk/dog.png",
+  };
+
+  // --- کمک‌کننده‌ها ---
+  function showSection(id) {
+    ["login", "game", "adminPanel"].forEach(sec => {
+      document.getElementById(sec).classList.remove("active");
+    });
+    document.getElementById(id).classList.add("active");
+  }
+
+  function getLicenseColor(type) {
+    if (type === "برنزه") return "bronze";
+    if (type === "نقره") return "silver";
+    if (type === "طلا") return "gold";
+    return "";
+  }
+
+  function formatDate(d) {
+    return new Date(d.seconds ? d.toDate() : d).toLocaleString("fa-IR");
+  }
+
+  // --- لاگین ---
+  async function login() {
+    const name = document.getElementById("loginName").value.trim();
+    const licenseCode = document.getElementById("loginLicense").value.trim();
+
+    if (!name || !licenseCode) {
+      alert("نام و کد لایسنس را وارد کنید");
+      return;
+    }
+
+    // بررسی نام تکراری
+    const userDoc = await db.collection("users").doc(name).get();
+    if (userDoc.exists) {
+      alert("این نام قبلا استفاده شده");
+      return;
+    }
+
+    // بررسی کد لایسنس
+    const licenseDoc = await db.collection("licenses").doc(licenseCode).get();
+    if (!licenseDoc.exists) {
+      alert("کد لایسنس نامعتبر است");
+      return;
+    }
+    const licenseData = licenseDoc.data();
+
+    // چک یک‌بار مصرف بودن و انقضا
+    if (licenseData.usedBy) {
+      if (licenseData.usedBy !== name) {
+        alert("این کد لایسنس قبلاً استفاده شده");
+        return;
+      }
+    }
+    const now = new Date();
+    if (licenseData.expiry && licenseData.expiry.toDate() < now) {
+      alert("کد لایسنس منقضی شده");
+      return;
+    }
+
+    // مقدار سکه کلیک بر اساس نوع لایسنس
+    if (licenseData.type === "برنزه") clickMultiplier = 1;
+    else if (licenseData.type === "نقره") clickMultiplier = 2;
+    else if (licenseData.type === "طلا") clickMultiplier = 3;
+    else clickMultiplier = 1;
+
+    // تعیین حیوان (یکیش رو رندوم می‌کنیم یا بر اساس لایسنس)
+    const animalKeys = Object.keys(animals);
+    let animalKey = licenseData.animal || animalKeys[Math.floor(Math.random() * animalKeys.length)];
+
+    // ثبت کاربر
+    await db.collection("users").doc(name).set({
+      coins: 0,
+      license: licenseCode,
+      licenseType: licenseData.type,
+      expiry: licenseData.expiry,
+      animal: animalKey,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    // به‌روزرسانی لایسنس
+    await db.collection("licenses").doc(licenseCode).update({
+      usedBy: name
+    });
+
+    currentUser = name;
+    currentLicense = licenseCode;
+    showSection("game");
+    loadGameData();
+  }
+
+  // --- بارگذاری اطلاعات بازی ---
+  async function loadGameData() {
+    if (!currentUser) return;
+
+    const userDoc = await db.collection("users").doc(currentUser).get();
+    if (!userDoc.exists) return;
+
+    const data = userDoc.data();
+    document.getElementById("userNameDisplay").textContent = currentUser;
+    document.getElementById("coinsCount").textContent = data.coins || 0;
+    document.getElementById("licenseTypeDisplay").textContent = data.licenseType;
+    document.getElementById("licenseTypeDisplay").className = "license-label " + getLicenseColor(data.licenseType);
+    document.getElementById("expiryDisplay").textContent = formatDate(data.expiry);
+    document.getElementById("animalImage").src = animals[data.animal] || animals.hamster;
+
+    // بروز رسانی سکه و چک انقضا
+    checkLicenseExpiry(data.expiry);
+  }
+
+  // --- بررسی انقضای لایسنس ---
+  function checkLicenseExpiry(expiry) {
+    if (!expiry) return;
+    const now = new Date();
+    const exp = expiry.seconds ? expiry.toDate() : new Date(expiry);
+    if (now > exp) {
+      alert("لایسنس شما منقضی شده است.");
+      logout();
+    }
+  }
+
+  // --- کلیک برای گرفتن سکه ---
+  async function clickAnimal() {
+    if (!currentUser) return;
+    // افزایش سکه بر اساس ضریب لایسنس
+    const userRef = db.collection("users").doc(currentUser);
+    const userDoc = await userRef.get();
+    if (!userDoc.exists) return;
+    const userData = userDoc.data();
+    checkLicenseExpiry(userData.expiry);
+
+    let coins = userData.coins || 0;
+    coins += clickMultiplier;
+    await userRef.update({ coins });
+    document.getElementById("coinsCount").textContent = coins;
+  }
+
+  // --- انتقال سکه ---
+  async function transferCoins() {
+    const targetName = document.getElementById("transferName").value.trim();
+    const amount = parseInt(document.getElementById("transferAmount").value);
+    if (!targetName || !amount || amount <= 0) {
+      alert("نام مقصد و مقدار معتبر وارد کنید.");
+      return;
+    }
+    if (!currentUser) return;
+
+    const senderRef = db.collection("users").doc(currentUser);
+    const senderDoc = await senderRef.get();
+    if (!senderDoc.exists) return;
+    const senderData = senderDoc.data();
+    if (senderData.coins < amount) {
+      alert("سکه کافی ندارید.");
+      return;
+    }
+
+    const targetRef = db.collection("users").doc(targetName);
+    const targetDoc = await targetRef.get();
+    if (!targetDoc.exists) {
+      alert("کاربر مقصد پیدا نشد.");
+      return;
+    }
+
+    // انتقال سکه
+    await senderRef.update({ coins: senderData.coins - amount });
+    await targetRef.update({ coins: (targetDoc.data().coins || 0) + amount });
+
+    alert("انتقال موفق بود.");
+    loadGameData();
+  }
+
+  // --- خروج ---
+  function logout() {
+    currentUser = null;
+    currentLicense = null;
+    showSection("login");
+  }
+
+  // --- پنل مدیریت ---
+  const ADMIN_PASS = "Ali.dr.N.";
+  async function showAdmin() {
+    const pass = prompt("رمز پنل مدیریت را وارد کنید:");
+    if (pass !== ADMIN_PASS) {
+      alert("رمز اشتباه است!");
+      return;
+    }
+    showSection("adminPanel");
+    loadAdminData();
+  }
+
+  async function loadAdminData() {
+    // بارگذاری لیست لایسنس‌ها
+    const snapshot = await db.collection("licenses").get();
+    const container = document.getElementById("licensesList");
+    container.innerHTML = "";
+    snapshot.forEach(doc => {
+      const d = doc.data();
+      container.innerHTML += `<div>
+        <b>کد:</b> ${doc.id} |
+        <b>نوع:</b> ${d.type} |
+        <b>روز:</b> ${d.days} |
+        <b>انقضا:</b> ${d.expiry ? formatDate(d.expiry) : "-"} |
+        <b>استفاده شده توسط:</b> ${d.usedBy || "-"}
+        <button onclick="rechargeLicense('${doc.id}',${d.days})">شارژ مجدد</button>
+      </div>`;
+    });
+  }
+
+  async function createLicense() {
+    const code = document.getElementById("newLicenseCode").value.trim();
+    const days = parseInt(document.getElementById("newLicenseDays").value);
+    const type = document.getElementById("newLicenseType").value;
+    if (!code || !days || days <= 0) {
+      alert("کد، تعداد روز و نوع معتبر وارد کنید.");
+      return;
+    }
+
+    const licenseDoc = await db.collection("licenses").doc(code).get();
+    if (licenseDoc.exists) {
+      alert("کد قبلا موجود است.");
+      return;
+    }
+
+    const expiry = new Date();
+    expiry.setDate(expiry.getDate() + days);
+
+    await db.collection("licenses").doc(code).set({
+      type,
+      days,
+      expiry: firebase.firestore.Timestamp.fromDate(expiry),
+      usedBy: null,
+      animal: null
+    });
+
+    alert("لایسنس ساخته شد.");
+    loadAdminData();
+  }
+
+  async function rechargeLicense(code, days) {
+    if (!confirm(`می‌خواهید کد ${code} را به مدت ${days} روز شارژ کنید؟`)) return;
+
+    const newExpiry = new Date();
+    newExpiry.setDate(newExpiry.getDate() + days);
+
+    await db.collection("licenses").doc(code).update({
+      expiry: firebase.firestore.Timestamp.fromDate(newExpiry),
+      usedBy: null
+    });
+
+    alert("شارژ انجام شد.");
+    loadAdminData();
+  }
+
+  // --- جدول جهانی (امتیازات) ---
+  async function loadLeaderboard() {
+    const snapshot = await db.collection("users").orderBy("coins", "desc").limit(10).get();
+    const table = document.getElementById("leaderboardTable");
+    table.innerHTML = "<tr><th>رتبه</th><th>نام</th><th>سکه</th><th>لایسنس</th></tr>";
+    let rank = 1;
+    snapshot.forEach(doc => {
+      const d = doc.data();
+      table.innerHTML += `<tr>
+        <td>${rank++}</td>
+        <td>${doc.id}</td>
+        <td>${d.coins || 0}</td>
+        <td>${d.licenseType || ""}</td>
+      </tr>`;
+    });
+  }
+
+  // --- آپدیت خودکار جدول و داده‌ها ---
+  setInterval(() => {
+    if (currentUser) loadGameData();
+    loadLeaderboard();
+  }, 5000);
+
+  // --- شروع ---
+  showSection("login");
+
+  // --- بارگذاری جدول جهانی هنگام باز شدن ---
+  window.onload = () => {
+    loadLeaderboard();
+  };
+</script>
+
+<body>
+  <div id="login" class="active">
