@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>بازی انفجار حرفه‌ای</title>
+<link rel="stylesheet" href="style.css" />
+<script src="/socket.io/socket.io.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+<div id="login">
+  <h2>ورود به بازی</h2>
+  <input type="text" id="username" placeholder="نام کاربری" />
+  <button onclick="login()">ورود</button>
+  <div id="loginMessage"></div>
+</div>
+
+<div id="game" style="display:none;">
+  <h2>بازی انفجار آنلاین</h2>
+  <div id="multiplier">1.00x</div>
+  <canvas id="crashChart" width="500" height="300"></canvas>
+
+  <input type="number" id="betAmount" placeholder="مقدار شرط" min="1" />
+  <button onclick="placeBet()">شرط بندی</button>
+  <button onclick="cashOut()">برداشت</button>
+  <div>موجودی شما: <span id="balance">0</span> تومان</div>
+
+  <h3>خرید ارز دیجیتال</h3>
+  <select id="cryptoSelect"></select>
+  <input type="number" id="cryptoAmount" placeholder="مقدار" min="0.0001" step="0.0001" />
+  <button onclick="buyCrypto()">خرید</button>
+
+  <h3>فروش ارز دیجیتال</h3>
+  <select id="cryptoSelectSell"></select>
+  <input type="number" id="cryptoAmountSell" placeholder="مقدار" min="0.0001" step="0.0001" />
+  <button onclick="sellCrypto()">فروش</button>
+
+  <div id="messages"></div>
+
+  <h3>جدول امتیازات</h3>
+  <ul id="leaderboardList"></ul>
+</div>
+
+<div id="adminPanel" style="display:none;">
+  <h2>پنل مدیریت</h2>
+  <input type="password" id="adminPass" placeholder="رمز عبور ادمین" />
+  <button onclick="loginAdmin()">ورود ادمین</button>
+  
+  <div id="adminControls" style="display:none;">
+    <h3>تنظیم قیمت ارزها</h3>
+    <div id="pricesControls"></div>
+
+    <h3>شارژ حساب کاربران</h3>
+    <input type="text" id="chargeUsername" placeholder="نام کاربری" />
+    <input type="number" id="chargeAmount" placeholder="مقدار" />
+    <button onclick="chargeUser()">شارژ</button>
+
+    <h3>حذف کاربر</h3>
+    <input type="text" id="deleteUsername" placeholder="نام کاربری" />
+    <button onclick="deleteUser()">حذف</button>
+  </div>
+  <div id="adminMessage"></div>
+</div>
+
+<script src="client.js"></script>
+</body>
+</html>
