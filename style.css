@@ -1,0 +1,52 @@
+body {
+  background: #111;
+  color: #eee;
+  font-family: Tahoma, sans-serif;
+  text-align: center;
+  margin: 0;
+  padding: 0;
+}
+#login, #game, #adminPanel {
+  max-width: 600px;
+  margin: 20px auto;
+  padding: 20px;
+  background: #222;
+  border-radius: 12px;
+}
+input, select, button {
+  padding: 10px;
+  margin: 5px;
+  border-radius: 8px;
+  border: none;
+}
+button {
+  background: #e67e22;
+  color: white;
+  cursor: pointer;
+}
+button:hover {
+  background: #d35400;
+}
+#multiplier {
+  font-size: 3em;
+  margin: 20px 0;
+  color: #f1c40f;
+}
+#leaderboardList {
+  list-style: none;
+  padding: 0;
+  text-align: right;
+}
+#leaderboardList li {
+  padding: 5px 0;
+  border-bottom: 1px solid #444;
+}
+#messages {
+  margin-top: 10px;
+  height: 80px;
+  overflow-y: auto;
+  background: #222;
+  padding: 10px;
+  border-radius: 10px;
+  font-size: 0.9em;
+}
